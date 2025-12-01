@@ -1,50 +1,88 @@
-# Docker Services:
-#   up - Start services (use: make up [service...] or make up MODE=prod, ARGS="--build" for options)
-#   down - Stop services (use: make down [service...] or make down MODE=prod, ARGS="--volumes" for options)
-#   build - Build containers (use: make build [service...] or make build MODE=prod)
-#   logs - View logs (use: make logs [service] or make logs SERVICE=backend, MODE=prod for production)
-#   restart - Restart services (use: make restart [service...] or make restart MODE=prod)
-#   shell - Open shell in container (use: make shell [service] or make shell SERVICE=gateway, MODE=prod, default: backend)
-#   ps - Show running containers (use MODE=prod for production)
-#
-# Convenience Aliases (Development):
-#   dev-up - Alias: Start development environment
-#   dev-down - Alias: Stop development environment
-#   dev-build - Alias: Build development containers
-#   dev-logs - Alias: View development logs
-#   dev-restart - Alias: Restart development services
-#   dev-shell - Alias: Open shell in backend container
-#   dev-ps - Alias: Show running development containers
-#   backend-shell - Alias: Open shell in backend container
-#   gateway-shell - Alias: Open shell in gateway container
-#   mongo-shell - Open MongoDB shell
-#
-# Convenience Aliases (Production):
-#   prod-up - Alias: Start production environment
-#   prod-down - Alias: Stop production environment
-#   prod-build - Alias: Build production containers
-#   prod-logs - Alias: View production logs
-#   prod-restart - Alias: Restart production services
-#
-# Backend:
-#   backend-build - Build backend TypeScript
-#   backend-install - Install backend dependencies
-#   backend-type-check - Type check backend code
-#   backend-dev - Run backend in development mode (local, not Docker)
-#
-# Database:
-#   db-reset - Reset MongoDB database (WARNING: deletes all data)
-#   db-backup - Backup MongoDB database
-#
-# Cleanup:
-#   clean - Remove containers and networks (both dev and prod)
-#   clean-all - Remove containers, networks, volumes, and images
-#   clean-volumes - Remove all volumes
-#
-# Utilities:
-#   status - Alias for ps
-#   health - Check service health
-#
-# Help:
-#   help - Display this help message
+DOCKER_COMPOSE ?= docker compose
 
+DEV_COMPOSE := docker/compose.development.yaml
+PROD_COMPOSE := docker/compose.production.yaml
+
+MODE ?= dev          # dev | prod
+SERVICE ?=           # optional: backend, gateway, mongo
+ARGS ?=
+
+ifeq ($(MODE),prod)
+COMPOSE_FILE := $(PROD_COMPOSE)
+else
+COMPOSE_FILE := $(DEV_COMPOSE)
+endif
+
+# -------- Core targets --------
+up:
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --env-file .env up $(ARGS) $(SERVICE)
+
+down:
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --env-file .env down $(ARGS)
+
+build:
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --env-file .env build $(SERVICE)
+
+logs:
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs -f $(SERVICE)
+
+restart:
+	$(MAKE) down MODE=$(MODE) SERVICE=$(SERVICE)
+	$(MAKE) up MODE=$(MODE) SERVICE=$(SERVICE) ARGS="--build"
+
+shell:
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) exec $(if $(SERVICE),$(SERVICE),backend) sh
+
+ps:
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) ps
+
+# -------- Dev aliases --------
+dev-up:
+	$(MAKE) up MODE=dev ARGS="--build"
+
+dev-down:
+	$(MAKE) down MODE=dev
+
+dev-build:
+	$(MAKE) build MODE=dev
+
+dev-logs:
+	$(MAKE) logs MODE=dev
+
+dev-restart:
+	$(MAKE) restart MODE=dev
+
+dev-shell:
+	$(MAKE) shell MODE=dev SERVICE=backend
+
+# -------- Prod aliases --------
+prod-up:
+	$(MAKE) up MODE=prod ARGS="-d --build"
+
+prod-down:
+	$(MAKE) down MODE=prod ARGS="-v"
+
+prod-build:
+	$(MAKE) build MODE=prod
+
+prod-logs:
+	$(MAKE) logs MODE=prod
+
+prod-restart:
+	$(MAKE) restart MODE=prod
+
+# -------- Cleanup / misc --------
+clean:
+	-$(DOCKER_COMPOSE) -f $(DEV_COMPOSE) down -v
+	-$(DOCKER_COMPOSE) -f $(PROD_COMPOSE) down -v
+
+status: ps
+
+help:
+	@echo "Usage:"
+	@echo "  make dev-up       # start dev (build + up)"
+	@echo "  make dev-down     # stop dev"
+	@echo "  make prod-up      # start prod (detached)"
+	@echo "  make prod-down    # stop prod + volumes"
+	@echo "  make logs SERVICE=gateway MODE=dev # logs"
+	@echo "  make shell SERVICE=backend MODE=dev # shell into container"

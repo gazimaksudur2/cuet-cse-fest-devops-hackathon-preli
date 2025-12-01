@@ -1,0 +1,14 @@
+# backend/Dockerfile.dev
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json tsconfig.json ./
+RUN npm install
+
+COPY src ./src
+
+EXPOSE 3847
+
+# Dev mode: live-reload via tsx
+CMD ["npm", "run", "dev"]

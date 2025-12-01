@@ -1,6 +1,51 @@
-# services:
-  # backend:
+version: "3.9"
 
-  # gateway:
+services:
+  mongo:
+    image: mongo:6
+    container_name: mongo-prod
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+    volumes:
+      - mongo-data-prod:/data/db
+    networks:
+      - app-net
 
-  # mongo:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: backend-prod
+    env_file:
+      - ../.env
+    depends_on:
+      - mongo
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: Dockerfile
+    container_name: gateway-prod
+    env_file:
+      - ../.env
+    environment:
+      BACKEND_URL: http://backend:${BACKEND_PORT}
+    depends_on:
+      - backend
+    networks:
+      - app-net
+    ports:
+      - "5921:5921"   # only gateway is exposed
+    restart: unless-stopped
+
+networks:
+  app-net:
+
+volumes:
+  mongo-data-prod:

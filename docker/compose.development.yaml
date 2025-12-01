@@ -1,6 +1,52 @@
-# services:
-  # backend:
+version: "3.9"
 
-  # gateway:
+services:
+  mongo:
+    image: mongo:6
+    container_name: mongo-dev
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      # This is how the official image gets an initial DB
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+    volumes:
+      - mongo-data-dev:/data/db
+    networks:
+      - app-net
 
-  # mongo:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    container_name: backend-dev
+    env_file:
+      - ../.env
+    depends_on:
+      - mongo
+    networks:
+      - app-net
+    # IMPORTANT: no ports here → not accessible from host
+
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: Dockerfile.dev
+    container_name: gateway-dev
+    env_file:
+      - ../.env
+    environment:
+      # Tell gateway where backend lives inside the Docker network
+      BACKEND_URL: http://backend:${BACKEND_PORT}
+    depends_on:
+      - backend
+    networks:
+      - app-net
+    ports:
+      - "5921:5921"   # only exposed entrypoint
+
+networks:
+  app-net:
+
+volumes:
+  mongo-data-dev:
